@@ -1,4 +1,3 @@
-import argparse
 import os
 import random
 from contextlib import nullcontext
@@ -56,62 +55,94 @@ def worker_init_fn(worker_id: int, base_seed: int, same_worker_seed: bool = True
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def parse():
+def parse(argparse):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--exp_dir', default='./exp', type=str,
-        help="The directory to save the best checkpoint file. Default to be ./exp"
+        '--exp_dir',
+        default='./exp',
+        type=str,
+        help="The directory to save the best checkpoint file. Default to be ./exp",
     )
     parser.add_argument(
-        '--data_dir', default='./data', type=str,
-        help="The directory that the datasets are placed. Default to be ./data"
+        '--data_dir',
+        default='./data',
+        type=str,
+        help="The directory that the datasets are placed. Default to be ./data",
     )
     parser.add_argument(
-        '--num_workers', default=None, type=int,
+        '--num_workers',
+        default=None,
+        type=int,
         help="The num_workers argument used for the training and validation dataloaders. "
-             "Default to be 1 for one-shot and 4 for 16- and full-shot."
+        "Default to be 1 for one-shot and 4 for 16- and full-shot.",
     )
     parser.add_argument(
-        '--train_bs', default=None, type=int,
-        help="The batch size for the training dataloader. Default to be 1 for one-shot and 4 for 16- and full-shot."
+        '--train_bs',
+        default=None,
+        type=int,
+        help="The batch size for the training dataloader. Default to be 1 for one-shot and 4 for 16- and full-shot.",
     )
     parser.add_argument(
-        '--val_bs', default=None, type=int,
-        help="The batch size for the validation dataloader. Default to be 1 for one-shot and 4 for 16- and full-shot."
+        '--val_bs',
+        default=None,
+        type=int,
+        help="The batch size for the validation dataloader. Default to be 1 for one-shot and 4 for 16- and full-shot.",
     )
     parser.add_argument(
-        '--dataset', required=True, type=str, choices=['whu', 'sbu', 'kvasir'],
-        help="Your target dataset. This argument is required."
+        '--dataset',
+        required=True,
+        type=str,
+        choices=['whu', 'sbu', 'kvasir'],
+        help="Your target dataset. This argument is required.",
     )
     parser.add_argument(
-        '--shot_num', default=None, type=int, choices=[1, 16],
+        '--shot_num',
+        default=None,
+        type=int,
+        choices=[1, 16],
         help="The number of your target setting. For one-shot please give --shot_num 1. "
-             "For 16-shot please give --shot_num 16. For full-shot please leave it blank. "
-             "Default to be full-shot."
+        "For 16-shot please give --shot_num 16. For full-shot please leave it blank. "
+        "Default to be full-shot.",
     )
     parser.add_argument(
-        '--sam_type', default='vit_l', type=str, choices=['vit_b', 'vit_l', 'vit_h'],
-        help='The type of the backbone SAM model. Default to be vit_l.'
+        '--sam_type',
+        default='vit_l',
+        type=str,
+        choices=['vit_b', 'vit_l', 'vit_h'],
+        help="The type of the backbone SAM model. Default to be vit_l.",
     )
     parser.add_argument(
-        '--cat_type', required=True, type=str, choices=['cat-a', 'cat-t'],
-        help='The type of the CAT-SAM model. This argument is required.'
+        '--cat_type',
+        required=True,
+        type=str,
+        choices=['cat-a', 'cat-t'],
+        help="The type of the CAT-SAM model. This argument is required.",
     )
     return parser.parse_args()
 
 
 def batch_to_cuda(batch, device):
     for key in batch.keys():
-        if key in ['images', 'gt_masks', 'point_coords', 'box_coords', 'noisy_object_masks', 'object_masks']:
+        if key in [
+            'images',
+            'gt_masks',
+            'point_coords',
+            'box_coords',
+            'noisy_object_masks',
+            'object_masks',
+        ]:
             batch[key] = [
-                item.to(device=device, dtype=torch.float32) if item is not None else None for item in batch[key]
+                item.to(device=device, dtype=torch.float32)
+                if item is not None
+                else None
+                for item in batch[key]
             ]
         elif key in ['point_labels']:
             batch[key] = [
-                item.to(device=device, dtype=torch.long) if item is not None else None for item in batch[key]
+                item.to(device=device, dtype=torch.long) if item is not None else None
+                for item in batch[key]
             ]
     return batch
-
 
 
 def main_worker(worker_id, worker_args):
@@ -120,12 +151,18 @@ def main_worker(worker_id, worker_args):
         worker_id = int(worker_id)
 
     gpu_num = len(worker_args.used_gpu)
-    world_size = os.environ['WORLD_SIZE'] if 'WORLD_SIZE' in os.environ.keys() else gpu_num
+    world_size = (
+        os.environ['WORLD_SIZE'] if 'WORLD_SIZE' in os.environ.keys() else gpu_num
+    )
     base_rank = os.environ['RANK'] if 'RANK' in os.environ.keys() else 0
     local_rank = base_rank * gpu_num + worker_id
     if gpu_num > 1:
-        dist.init_process_group(backend='nccl', init_method=worker_args.dist_url,
-                                world_size=world_size, rank=local_rank)
+        dist.init_process_group(
+            backend='nccl',
+            init_method=worker_args.dist_url,
+            world_size=world_size,
+            rank=local_rank,
+        )
 
     device = torch.device(f"cuda:{worker_id}")
     torch.cuda.set_device(device)
@@ -133,7 +170,11 @@ def main_worker(worker_id, worker_args):
     if worker_args.cat_type == 'cat-t' and worker_args.dataset in ['kvasir', 'sbu']:
         transforms = [VerticalFlip(p=0.5), HorizontalFlip(p=0.5)]
     else:
-        transforms = [VerticalFlip(p=0.5), HorizontalFlip(p=0.5), RandomCrop(scale=[0.1, 1.0], p=1.0)]
+        transforms = [
+            VerticalFlip(p=0.5),
+            HorizontalFlip(p=0.5),
+            RandomCrop(scale=[0.1, 1.0], p=1.0),
+        ]
 
     max_object_num = None
     if worker_args.dataset == 'whu':
@@ -144,16 +185,23 @@ def main_worker(worker_id, worker_args):
     elif worker_args.dataset == 'sbu':
         dataset_class = SBUDataset
     else:
-        raise ValueError(f'invalid dataset name: {worker_args.dataset}!')
+        raise ValueError(f"invalid dataset name: {worker_args.dataset}!")
 
     dataset_dir = join(worker_args.data_dir, worker_args.dataset)
     train_dataset = dataset_class(
-        data_dir=dataset_dir, train_flag=True, shot_num=worker_args.shot_num,
-        transforms=transforms, max_object_num=max_object_num
+        data_dir=dataset_dir,
+        train_flag=True,
+        shot_num=worker_args.shot_num,
+        transforms=transforms,
+        max_object_num=max_object_num,
     )
     val_dataset = dataset_class(data_dir=dataset_dir, train_flag=False)
 
-    train_bs = worker_args.train_bs if worker_args.train_bs else (1 if worker_args.shot_num == 1 else 4)
+    train_bs = (
+        worker_args.train_bs
+        if worker_args.train_bs
+        else (1 if worker_args.shot_num == 1 else 4)
+    )
     val_bs = worker_args.val_bs if worker_args.val_bs else 2
     train_workers, val_workers = 1 if worker_args.shot_num == 1 else 4, 2
     if worker_args.num_workers is not None:
@@ -164,13 +212,22 @@ def main_worker(worker_id, worker_args):
         sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_bs = int(train_bs / torch.distributed.get_world_size())
     train_dataloader = DataLoader(
-        dataset=train_dataset, batch_size=train_bs, shuffle=sampler is None, num_workers=train_workers,
-        sampler=sampler, drop_last=False, collate_fn=train_dataset.collate_fn,
-        worker_init_fn=partial(worker_init_fn, base_seed=3407)
+        dataset=train_dataset,
+        batch_size=train_bs,
+        shuffle=sampler is None,
+        num_workers=train_workers,
+        sampler=sampler,
+        drop_last=False,
+        collate_fn=train_dataset.collate_fn,
+        worker_init_fn=partial(worker_init_fn, base_seed=3407),
     )
     val_dataloader = DataLoader(
-        dataset=val_dataset, batch_size=val_bs, shuffle=False, num_workers=val_workers,
-        drop_last=False, collate_fn=val_dataset.collate_fn
+        dataset=val_dataset,
+        batch_size=val_bs,
+        shuffle=False,
+        num_workers=val_workers,
+        drop_last=False,
+        collate_fn=val_dataset.collate_fn,
     )
 
     if worker_args.cat_type == 'cat-t':
@@ -178,16 +235,21 @@ def main_worker(worker_id, worker_args):
     elif worker_args.cat_type == 'cat-a':
         model_class = CATSAMA
     else:
-        raise ValueError(f'invalid cat_type: {worker_args.cat_type}!')
+        raise ValueError(f"invalid cat_type: {worker_args.cat_type}!")
     model = model_class(model_type=worker_args.sam_type).to(device=device)
     if torch.distributed.is_initialized():
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=False,
         )
 
     optimizer = torch.optim.AdamW(
-        params=[p for p in model.parameters() if p.requires_grad], lr=1e-3, weight_decay=1e-4
+        params=[p for p in model.parameters() if p.requires_grad],
+        lr=1e-3,
+        weight_decay=1e-4,
     )
     # full-shot
     if worker_args.shot_num is None:
@@ -216,7 +278,7 @@ def main_worker(worker_id, worker_args):
 
     exp_path = join(
         worker_args.exp_dir,
-        f'{worker_args.dataset}_{worker_args.sam_type}_{worker_args.cat_type}_{worker_args.shot_num if worker_args.shot_num else "full"}shot'
+        f"{worker_args.dataset}_{worker_args.sam_type}_{worker_args.cat_type}_{worker_args.shot_num if worker_args.shot_num else 'full'}shot",
     )
     os.makedirs(exp_path, exist_ok=True)
     model.train()
@@ -230,8 +292,11 @@ def main_worker(worker_id, worker_args):
         for train_step, batch in enumerate(train_dataloader):
             batch = batch_to_cuda(batch, device)
             masks_pred = model(
-                imgs=batch['images'], point_coords=batch['point_coords'], point_labels=batch['point_labels'],
-                box_coords=batch['box_coords'], noisy_masks=batch['noisy_object_masks']
+                imgs=batch['images'],
+                point_coords=batch['point_coords'],
+                point_labels=batch['point_labels'],
+                box_coords=batch['box_coords'],
+                noisy_masks=batch['noisy_object_masks'],
             )
             masks_gt = batch['object_masks']
             for masks in [masks_pred, masks_gt]:
@@ -246,7 +311,7 @@ def main_worker(worker_id, worker_args):
             bce_loss_list, dice_loss_list, focal_loss_list = [], [], []
             for i in range(len(masks_pred)):
                 pred, label = masks_pred[i], masks_gt[i]
-                label = torch.where(torch.gt(label, 0.), 1., 0.)
+                label = torch.where(torch.gt(label, 0.0), 1.0, 0.0)
                 b_loss = F.binary_cross_entropy_with_logits(pred, label.float())
                 d_loss = calculate_dice_loss(pred, label)
 
@@ -259,7 +324,7 @@ def main_worker(worker_id, worker_args):
             loss_dict = dict(
                 total_loss=total_loss.clone().detach(),
                 bce_loss=bce_loss.clone().detach(),
-                dice_loss=dice_loss.clone().detach()
+                dice_loss=dice_loss.clone().detach(),
             )
 
             backward_context = nullcontext
@@ -273,15 +338,22 @@ def main_worker(worker_id, worker_args):
                 for key in loss_dict.keys():
                     if hasattr(loss_dict[key], 'detach'):
                         loss_dict[key] = loss_dict[key].detach()
-                    torch.distributed.reduce(loss_dict[key], dst=0, op=torch.distributed.ReduceOp.SUM)
+                    torch.distributed.reduce(
+                        loss_dict[key], dst=0, op=torch.distributed.ReduceOp.SUM
+                    )
                     loss_dict[key] /= torch.distributed.get_world_size()
 
             if train_pbar:
                 train_pbar.update(1)
-                str_step_info = "Epoch: {epoch}/{epochs:4}. " \
-                                "Loss: {total_loss:.4f}(total), {bce_loss:.4f}(bce), {dice_loss:.4f}(dice)".format(
-                    epoch=epoch, epochs=max_epoch_num,
-                    total_loss=loss_dict['total_loss'], bce_loss=loss_dict['bce_loss'], dice_loss=loss_dict['dice_loss']
+                str_step_info = (
+                    "Epoch: {epoch}/{epochs:4}. "
+                    "Loss: {total_loss:.4f}(total), {bce_loss:.4f}(bce), {dice_loss:.4f}(dice)".format(
+                        epoch=epoch,
+                        epochs=max_epoch_num,
+                        total_loss=loss_dict['total_loss'],
+                        bce_loss=loss_dict['bce_loss'],
+                        dice_loss=loss_dict['dice_loss'],
+                    )
                 )
                 train_pbar.set_postfix_str(str_step_info)
 
@@ -328,16 +400,19 @@ def main_worker(worker_id, worker_args):
 
             if miou > best_miou:
                 torch.save(
-                    model.state_dict() if not hasattr(model, 'module') else model.module.state_dict(),
-                    join(exp_path, "best_model.pth")
+                    model.state_dict()
+                    if not hasattr(model, 'module')
+                    else model.module.state_dict(),
+                    join(exp_path, "best_model.pth"),
                 )
                 best_miou = miou
-                print(f'Best mIoU has been updated to {best_miou:.2%}!')
-
+                print(f"Best mIoU has been updated to {best_miou:.2%}!")
 
 
 if __name__ == '__main__':
-    args = parse()
+    import argparse
+
+    args = parse(argparse)
 
     if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
         used_gpu = os.environ['CUDA_VISIBLE_DEVICES'].split(',')
@@ -356,8 +431,10 @@ if __name__ == '__main__':
         except RuntimeError:
             try:
                 mp.set_start_method('forkserver')
-                print("Fail to initialize multiprocessing module by spawn method. "
-                      "Use forkserver method instead. Please be careful about it.")
+                print(
+                    "Fail to initialize multiprocessing module by spawn method. "
+                    "Use forkserver method instead. Please be careful about it."
+                )
             except RuntimeError as e:
                 raise RuntimeError(
                     "Your server supports neither spawn or forkserver method as multiprocessing start methods. "
@@ -365,6 +442,6 @@ if __name__ == '__main__':
                 )
 
         # dist_url is fixed to localhost here, so only single-node DDP is supported now.
-        args.dist_url = "tcp://127.0.0.1" + f':{get_idle_port()}'
+        args.dist_url = f"tcp://127.0.0.1:{get_idle_port()}"
         # spawn one subprocess for each GPU
         mp.spawn(main_worker, nprocs=args.gpu_num, args=(args,))
