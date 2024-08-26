@@ -1,2 +1,14 @@
 **/.DS_Store
 **/.idea/
+exp/
+pretrained/
+venv/
+.venv/
+__pycache__
+*.egg-info
+*.jpeg
+*.jpg
+*.png
+*.tiff
+*.tif
+*.zip
