@@ -118,6 +118,13 @@ def parse(argparse):
         choices=['cat-a', 'cat-t'],
         help="The type of the CAT-SAM model. This argument is required.",
     )
+    parser.add_argument(
+        '--device',
+        default='cuda',
+        type=str,
+        choices=['cpu', 'cuda'],
+        help="Device type, if type is cuda, available CUDA devices will be used. Default to be cuda.",
+    )
     return parser.parse_args()
 
 
@@ -164,8 +171,11 @@ def main_worker(worker_id, worker_args):
             rank=local_rank,
         )
 
-    device = torch.device(f"cuda:{worker_id}")
-    torch.cuda.set_device(device)
+    if worker_args.device == 'cuda':
+        device = torch.device(f"cuda:{worker_id}")
+        torch.cuda.set_device(device)
+    else:
+        device = torch.device('cpu')
 
     if worker_args.cat_type == 'cat-t' and worker_args.dataset in ['kvasir', 'sbu']:
         transforms = [VerticalFlip(p=0.5), HorizontalFlip(p=0.5)]

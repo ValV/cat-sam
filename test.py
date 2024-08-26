@@ -18,40 +18,66 @@ from cat_sam.utils.evaluators import SamHQIoU, StreamSegMetrics
 def parse():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--data_dir', default='./data', type=str,
-        help="The directory that the datasets are placed. Default to be ./data"
+        '--data_dir',
+        default='./data',
+        type=str,
+        help="The directory that the datasets are placed. Default to be ./data",
     )
     parser.add_argument(
-        '--num_workers', default=4, type=int,
-        help="The num_workers argument used for the testing dataloaders. Default to be 4."
+        '--num_workers',
+        default=4,
+        type=int,
+        help="The num_workers argument used for the testing dataloaders. Default to be 4.",
     )
     parser.add_argument(
-        '--batch_size', default=2, type=int,
-        help="The batch size for the testing dataloader. Default to be 2."
+        '--batch_size',
+        default=2,
+        type=int,
+        help="The batch size for the testing dataloader. Default to be 2.",
     )
     parser.add_argument(
-        '--dataset', required=True, type=str, choices=['whu', 'sbu', 'kvasir'],
-        help="Your target dataset. This argument is required."
+        '--dataset',
+        required=True,
+        type=str,
+        choices=['whu', 'sbu', 'kvasir'],
+        help="Your target dataset. This argument is required.",
     )
     parser.add_argument(
-        '--ckpt_path', required=True, type=str,
-        help="The absolute path to your target checkpoint file. This argument is required."
+        '--ckpt_path',
+        required=True,
+        type=str,
+        help="The absolute path to your target checkpoint file. This argument is required.",
     )
     parser.add_argument(
-        '--sam_type', default='vit_l', type=str, choices=['vit_b', 'vit_l', 'vit_h'],
-        help='The type of the backbone SAM model. Default to be vit_l.'
+        '--sam_type',
+        default='vit_l',
+        type=str,
+        choices=['vit_b', 'vit_l', 'vit_h'],
+        help='The type of the backbone SAM model. Default to be vit_l.',
     )
     parser.add_argument(
-        '--cat_type', required=True, type=str, choices=['cat-a', 'cat-t'],
-        help='The type of the CAT-SAM model. This argument is required.'
+        '--cat_type',
+        required=True,
+        type=str,
+        choices=['cat-a', 'cat-t'],
+        help='The type of the CAT-SAM model. This argument is required.',
+    )
+    parser.add_argument(
+        '--device',
+        default='cuda',
+        type=str,
+        choices=['cpu', 'cuda'],
+        help="Device type, if type is cuda, available CUDA devices will be used. Default to be cuda.",
     )
     return parser.parse_args()
 
 
-
 def run_test(test_args):
     set_randomness()
-    device = torch.device("cuda:0")
+    # device = torch.device(f"cuda:{test.args.device}")
+    device = torch.device(
+        test_args.device
+    )  # assume that CUDA_VISIBLE_DEVICES variable will do the trick
     torch.cuda.set_device(device)
 
     if test_args.dataset == 'whu':
@@ -67,9 +93,12 @@ def run_test(test_args):
         data_dir=join(test_args.data_dir, test_args.dataset), train_flag=False
     )
     test_dataloader = DataLoader(
-        dataset=test_dataset, shuffle=False, drop_last=False,
-        batch_size=test_args.batch_size, num_workers=test_args.num_workers,
-        collate_fn=test_dataset.collate_fn
+        dataset=test_dataset,
+        shuffle=False,
+        drop_last=False,
+        batch_size=test_args.batch_size,
+        num_workers=test_args.num_workers,
+        collate_fn=test_dataset.collate_fn,
     )
 
     if test_args.cat_type == 'cat-t':
@@ -119,10 +148,10 @@ def run_test(test_args):
     print(f'mIoU: {miou:.2%}')
 
 
-
 if __name__ == '__main__':
     args = parse()
-    used_gpu = get_idle_gpu(gpu_num=1)
+    used_gpu = get_idle_gpu(gpu_num=1)  # get the least utilized GPU
+    print(f"INFO: least utilized GPUs = {used_gpu}")
     os.environ['CUDA_VISIBLE_DEVICES'] = str(used_gpu[0])
     args.used_gpu, args.gpu_num = used_gpu, 1
     run_test(test_args=args)
